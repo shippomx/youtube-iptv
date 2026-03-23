@@ -1,0 +1,16 @@
+services:
+  iptv:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      # Synology NAS 路径，TrueNAS 可改为 /mnt/pool/iptv
+      - /volume1/docker/iptv:/app/data
+    environment:
+      - DB_PATH=/app/data/channels.db
+      - REFRESH_INTERVAL_MINUTES=30
+      - MAX_CONCURRENT_RESOLVES=5
+      - FAIL_THRESHOLD=3
+      - RESOLVE_TIMEOUT_SECONDS=30
+      - HEALTH_CHECK_TIMEOUT_SECONDS=5
+    restart: unless-stopped
