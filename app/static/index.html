@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV Manager</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+    .card { background: #fff; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .form-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    input[type=text], input[type=url] { flex: 1; min-width: 150px; padding: .5rem .75rem; border: 1px solid #ddd; border-radius: 6px; font-size: .875rem; }
+    button { padding: .5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-size: .875rem; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-sm { padding: .25rem .625rem; font-size: .8rem; }
+    .btn-refresh { background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd; }
+    .btn-delete { background: #fff0f0; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-export { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    .btn-refresh-all { background: #fefce8; color: #ca8a04; border: 1px solid #fde68a; }
+    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+    th { text-align: left; padding: .625rem .75rem; border-bottom: 2px solid #e5e7eb; color: #6b7280; font-weight: 600; }
+    td { padding: .625rem .75rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    .status-ok { color: #16a34a; font-weight: 600; }
+    .status-dead { color: #dc2626; font-weight: 600; }
+    .status-unknown, .status-pending { color: #9ca3af; }
+    .toggle { cursor: pointer; user-select: none; }
+    .actions { display: flex; gap: .5rem; }
+    .header-actions { display: flex; gap: .75rem; margin-bottom: 1rem; }
+    .notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: .625rem 1rem; border-radius: 6px; font-size: .875rem; color: #1d4ed8; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+<div class="container" x-data="iptvApp()">
+  <h1>IPTV Manager</h1>
+
+  <div class="notice" x-show="notice" x-text="notice" style="display:none"></div>
+
+  <div class="card">
+    <h2 style="font-size:1rem;margin-bottom:.875rem">添加频道</h2>
+    <div class="form-row">
+      <input type="text" x-model="form.name" placeholder="频道名称（必填）" />
+      <input type="url" x-model="form.source_url" placeholder="源地址（YouTube Live URL，必填）" />
+    </div>
+    <div class="form-row">
+      <input type="text" x-model="form.group_name" placeholder="分组（默认 default）" />
+      <input type="url" x-model="form.logo_url" placeholder="Logo URL（可选）" />
+      <button class="btn-primary" @click="addChannel">添加</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="header-actions">
+      <button class="btn-refresh-all" @click="refreshAll">全量刷新</button>
+      <button class="btn-export" @click="copyM3U">复制 M3U 链接</button>
+      <button class="btn-export" @click="exportM3U">下载 M3U</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>频道</th><th>分组</th><th>状态</th><th>最后检测</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="ch in channels" :key="ch.id">
+          <tr>
+            <td>
+              <span class="toggle" @click="toggleEnabled(ch)" :title="ch.enabled ? '点击禁用' : '点击启用'">
+                <span x-text="ch.enabled ? '●' : '○'" :style="ch.enabled ? 'color:#16a34a' : 'color:#9ca3af'"></span>
+              </span>
+              &nbsp;<span x-text="ch.name"></span>
+            </td>
+            <td x-text="ch.group_name"></td>
+            <td :class="'status-' + ch.status" x-text="ch.status"></td>
+            <td x-text="ch.last_check ? new Date(ch.last_check).toLocaleString() : '—'"></td>
+            <td class="actions">
+              <button class="btn-sm btn-refresh" @click="refreshOne(ch.id)">刷新</button>
+              <button class="btn-sm btn-delete" @click="deleteChannel(ch.id)">删除</button>
+            </td>
+          </tr>
+        </template>
+        <tr x-show="channels.length === 0">
+          <td colspan="5" style="text-align:center;color:#9ca3af;padding:2rem">暂无频道，请先添加</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function iptvApp() {
+  return {
+    channels: [],
+    notice: '',
+    form: { name: '', source_url: '', group_name: 'default', logo_url: '' },
+
+    async init() {
+      await this.loadChannels();
+    },
+
+    async loadChannels() {
+      const resp = await fetch('/channels');
+      this.channels = await resp.json();
+    },
+
+    showNotice(msg) {
+      this.notice = msg;
+      setTimeout(() => this.notice = '', 3000);
+    },
+
+    async addChannel() {
+      if (!this.form.name || !this.form.source_url) {
+        this.showNotice('名称和源地址为必填项');
+        return;
+      }
+      const payload = { ...this.form };
+      if (!payload.logo_url) delete payload.logo_url;
+      const resp = await fetch('/channels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        this.form = { name: '', source_url: '', group_name: 'default', logo_url: '' };
+        await this.loadChannels();
+        this.showNotice('频道已添加，后台刷新中…');
+      } else {
+        const err = await resp.json();
+        this.showNotice('添加失败：' + (err.detail || resp.status));
+      }
+    },
+
+    async deleteChannel(id) {
+      if (!confirm('确认删除？')) return;
+      await fetch(`/channels/${id}`, { method: 'DELETE' });
+      await this.loadChannels();
+    },
+
+    async toggleEnabled(ch) {
+      await fetch(`/channels/${ch.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !ch.enabled }),
+      });
+      await this.loadChannels();
+    },
+
+    async refreshOne(id) {
+      await fetch(`/channels/${id}/refresh`, { method: 'POST' });
+      this.showNotice('已触发刷新，稍后查看状态');
+      setTimeout(() => this.loadChannels(), 5000);
+    },
+
+    async refreshAll() {
+      await fetch('/channels/refresh-all', { method: 'POST' });
+      this.showNotice('全量刷新已触发，稍后查看状态');
+      setTimeout(() => this.loadChannels(), 10000);
+    },
+
+    copyM3U() {
+      const url = window.location.origin + '/m3u';
+      navigator.clipboard.writeText(url).then(() => this.showNotice('M3U 链接已复制：' + url));
+    },
+
+    async exportM3U() {
+      const resp = await fetch('/m3u');
+      const text = await resp.text();
+      const blob = new Blob([text], { type: 'application/x-mpegurl' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'iptv.m3u';
+      a.click();
+    },
+  };
+}
+</script>
+</body>
+</html>
