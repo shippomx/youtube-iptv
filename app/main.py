@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -31,4 +32,5 @@ app.include_router(channels.router)
 app.include_router(m3u.router)
 app.include_router(health.router)
 
-app.mount("/", StaticFiles(directory="app/static", html=True), name="static")
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")

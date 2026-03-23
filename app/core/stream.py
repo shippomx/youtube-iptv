@@ -13,4 +13,5 @@ async def resolve_stream(source_url: str, timeout: int = 30) -> str | None:
         return stdout.decode().strip() or None
     except asyncio.TimeoutError:
         proc.kill()
+        await proc.wait()
         return None

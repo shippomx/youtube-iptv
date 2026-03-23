@@ -29,7 +29,9 @@ async def test_resolve_stream_timeout():
     mock_proc = MagicMock()
     mock_proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError)
     mock_proc.kill = MagicMock()
+    mock_proc.wait = AsyncMock()
     with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
         result = await resolve_stream("https://youtube.com/watch?v=xxx", timeout=1)
     assert result is None
     mock_proc.kill.assert_called_once()
+    mock_proc.wait.assert_called_once()
