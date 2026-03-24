@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     fail_threshold: int = 3
     resolve_timeout_seconds: int = 30
     health_check_timeout_seconds: int = 5
+    cookies_path: str = ""  # yt-dlp cookies 文件路径，空则不使用
 
     model_config = {"env_file": ".env", "case_sensitive": False}
 

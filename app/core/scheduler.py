@@ -30,7 +30,9 @@ async def _resolve_and_check(channel_id: int) -> None:
                 return
 
             stream_url = await resolve_stream(
-                ch.source_url, timeout=settings.resolve_timeout_seconds
+                ch.source_url,
+                timeout=settings.resolve_timeout_seconds,
+                cookies_path=settings.cookies_path,
             )
 
             if stream_url:

@@ -13,4 +13,5 @@ services:
       - FAIL_THRESHOLD=3
       - RESOLVE_TIMEOUT_SECONDS=30
       - HEALTH_CHECK_TIMEOUT_SECONDS=5
+      - COOKIES_PATH=/app/data/cookies.txt
     restart: unless-stopped
