@@ -5,22 +5,30 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.stream import resolve_stream
 from app.db.database import get_db
 from app.db.models import Channel
 
 router = APIRouter(tags=["proxy"])
 
+# yt-dlp 直接下载并输出到 stdout（处理所有 YouTube 认证），ffmpeg 仅做格式转换
+_YTDLP_ARGS = [
+    "yt-dlp", "--no-update",
+    "-f", "b",
+    "--extractor-args", "youtube:player_client=android",
+    "--downloader", "ffmpeg",
+    "--downloader-args", "ffmpeg_i:-re",
+    "-o", "-",   # 输出到 stdout
+]
 
-async def _stream_ffmpeg(stream_url: str):
-    """启动 ffmpeg 从 YouTube HLS 拉流并以 MPEG-TS 格式输出到 stdout。"""
-    cmd = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error",
-        "-i", stream_url,
-        "-c", "copy",
-        "-f", "mpegts",
-        "pipe:1",
-    ]
+
+async def _stream_channel(source_url: str, cookies_path: str = ""):
+    """yt-dlp 下载 YouTube HLS 并输出 MPEG-TS 到 stdout。"""
+    import os
+    cmd = list(_YTDLP_ARGS)
+    if cookies_path and os.path.isfile(cookies_path):
+        cmd += ["--cookies", cookies_path]
+    cmd.append(source_url)
+
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -40,23 +48,9 @@ async def _stream_ffmpeg(stream_url: str):
         await proc.wait()
 
 
-async def _resolve_and_stream(source_url: str):
-    """实时解析 YouTube URL 获取带当前 IP 签名的流地址，然后通过 ffmpeg 转发。"""
-    stream_url = await resolve_stream(
-        source_url,
-        timeout=settings.resolve_timeout_seconds,
-        cookies_path=settings.cookies_path,
-    )
-    if not stream_url:
-        return
-
-    async for chunk in _stream_ffmpeg(stream_url):
-        yield chunk
-
-
 @router.get("/proxy/{channel_id}")
 async def proxy_stream(channel_id: int, db: Session = Depends(get_db)):
-    """实时解析 + ffmpeg 代理，绕过 YouTube HLS IP 绑定限制。"""
+    """yt-dlp 全程代理 YouTube 直播流（处理认证+段下载），客户端收到 MPEG-TS。"""
     ch = db.get(Channel, channel_id)
     if not ch or not ch.enabled:
         raise HTTPException(status_code=404, detail="Channel not found")
@@ -64,6 +58,6 @@ async def proxy_stream(channel_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No source URL")
 
     return StreamingResponse(
-        _resolve_and_stream(ch.source_url),
+        _stream_channel(ch.source_url, settings.cookies_path),
         media_type="video/mp2t",
     )
