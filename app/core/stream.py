@@ -4,7 +4,8 @@ import os
 
 async def resolve_stream(source_url: str, timeout: int = 30, cookies_path: str = "") -> str | None:
     """调用 yt-dlp 提取真实流地址，超时或失败返回 None。"""
-    cmd = ["yt-dlp", "-g", "-f", "best"]
+    cmd = ["yt-dlp", "--no-update", "-g", "-f", "best",
+           "--extractor-args", "youtube:player_client=android"]
     if cookies_path and os.path.isfile(cookies_path):
         cmd += ["--cookies", cookies_path]
     cmd.append(source_url)
