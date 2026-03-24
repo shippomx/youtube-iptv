@@ -4,8 +4,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Synology NAS 路径，TrueNAS 可改为 /mnt/pool/iptv
-      - /volume1/docker/iptv:/app/data
+      # 数据目录，Synology 可改为 /volume1/docker/iptv，TrueNAS 可改为 /mnt/pool/iptv
+      - ./data:/app/data
     environment:
       - DB_PATH=/app/data/channels.db
       - REFRESH_INTERVAL_MINUTES=30
