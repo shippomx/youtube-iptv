@@ -23,7 +23,7 @@ def test_m3u_includes_ok_channel(client, db_session):
     resp = client.get("/m3u")
     assert resp.status_code == 200
     assert "TVBS" in resp.text
-    assert "https://cdn.example.com/stream.m3u8" in resp.text
+    assert "/proxy/" in resp.text
     assert 'group-title="新闻"' in resp.text
     assert 'tvg-logo="https://logo.example.com/tvbs.png"' in resp.text
 
@@ -71,6 +71,7 @@ def test_m3u_include_dead_param(client, db_session):
 
     resp = client.get("/m3u?include_dead=true")
     assert "BBC" in resp.text
+    assert "/proxy/" in resp.text
 
 
 def test_m3u_excludes_disabled_channel(client, db_session):

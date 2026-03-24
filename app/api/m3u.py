@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ router = APIRouter(tags=["m3u"])
 
 @router.get("/m3u", response_class=PlainTextResponse)
 def get_m3u(
+    request: Request,
     include_dead: bool = Query(False),
     db: Session = Depends(get_db),
 ):
@@ -22,11 +23,12 @@ def get_m3u(
 
     channels = query.all()
 
+    base_url = str(request.base_url).rstrip("/")
     lines = ["#EXTM3U"]
     for ch in channels:
         logo = f' tvg-logo="{ch.logo_url}"' if ch.logo_url else ""
         group = ch.group_name or "default"
         lines.append(f'#EXTINF:-1{logo} group-title="{group}",{ch.name}')
-        lines.append(ch.stream_url)
+        lines.append(f"{base_url}/proxy/{ch.id}")
 
     return "\n".join(lines) + "\n"

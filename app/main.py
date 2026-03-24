@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import channels, m3u, health
+from app.api import channels, m3u, health, proxy
 from app.core.scheduler import create_scheduler, refresh_all_channels
 
 
@@ -31,6 +31,7 @@ app = FastAPI(title="IPTV SaaS", lifespan=lifespan)
 app.include_router(channels.router)
 app.include_router(m3u.router)
 app.include_router(health.router)
+app.include_router(proxy.router)
 
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
